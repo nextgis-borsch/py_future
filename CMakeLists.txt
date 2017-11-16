@@ -32,6 +32,11 @@ set(CMAKE_COLOR_MAKEFILE ON)
 # set path to additional CMake modules
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 
+if(OSX_FRAMEWORK AND (BUILD_SHARED_LIBS OR BUILD_STATIC_LIBS))
+  message(FATAL_ERROR "Only OSX_FRAMEWORK key or any or both BUILD_SHARED_LIBS
+                       and BUILD_STATIC_LIBS keys are permitted")
+endif()
+
 if(OSX_FRAMEWORK)
   set(INSTALL_LIB_DIR "${CMAKE_INSTALL_PREFIX}/Library" CACHE INTERNAL "Installation directory for libraries" FORCE)
   set(CMAKE_MACOSX_RPATH ON)
@@ -58,7 +63,14 @@ if(WITH_PYTHON2)
             endif()
         endif()
     else()
-        #TODO
+        find_package(PythonInterp 2)
+        if(PYTHONINTERP_FOUND)
+            set(PYTHON2_EXECUTABLE ${PYTHON_EXECUTABLE})
+            set(PYTHON2_VERSION_MAJOR ${PYTHON_VERSION_MAJOR})
+            set(PYTHON2_VERSION_MINOR ${PYTHON_VERSION_MINOR})
+        else()
+            message(WARNING "Cannot find python 2")
+        endif()
     endif()
 endif()
 
@@ -142,9 +154,74 @@ status_message("Install")
 
 if(NOT SKIP_INSTALL_LIBRARIES AND NOT SKIP_INSTALL_ALL )
     if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-        #TODO
+        set(SETUP_OPTS "${SETUP_OPTS} --single-version-externally-managed --record=rekord.txt --prefix=${CMAKE_INSTALL_PREFIX}")
+
+        macro(install_mac_py ver)
+            install(CODE "execute_process(
+                COMMAND ${PYTHON${ver}_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}/setup.py install ${SETUP_OPTS}
+                WORKING_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}
+                )")
+        endmacro()
+
+        if(PYTHON2_EXECUTABLE)
+            install_mac_py(2)
+        endif()
+
+        if(PYTHON3_EXECUTABLE)
+            install_mac_py(3)
+        endif()
     elseif(UNIX)
-        #TODO
+        macro(install_py ver)
+            execute_process ( COMMAND ${PYTHON${ver}_EXECUTABLE} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())" OUTPUT_VARIABLE PY_SITE_PACKAGES OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+            set(TEST_CMD "try:
+        import setuptools
+        print(1)
+    except ImportError:
+        pass")
+
+            execute_process ( COMMAND ${PYTHON${ver}_EXECUTABLE} -c ${TEST_CMD} OUTPUT_VARIABLE PY_HAVE_SETUPTOOLS OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+            set(SETUP_OPTS)
+
+            if(PY_HAVE_SETUPTOOLS)
+                set(SETUP_OPTS "${SETUP_OPTS} --single-version-externally-managed --record=rekord.txt")
+            endif()
+
+            string( LENGTH "$ENV{DESTDIR}" DESTDIRLEN )
+            if ( ${DESTDIRLEN} GREATER 0 )
+                set(SETUP_OPTS "${SETUP_OPTS} --root=$ENV{DESTDIR}")
+            elseif(PYTHON_DESTDIR)
+                set(SETUP_OPTS "${SETUP_OPTS} --root=${PYTHON_DESTDIR}")
+            endif()
+
+            # check debian
+            string(FIND ${PY_SITE_PACKAGES} "dist-packages" PY_DIST_POS)
+            if(${PY_DIST_POS} GREATER -1)
+                set(SETUP_OPTS "${SETUP_OPTS} --install-layout=deb")
+            endif()
+
+            # TODO: do we need --install-lib=$(PYTHON_INSTALL_LIB) ?
+
+            set(SETUP_OPTS "${SETUP_OPTS} --prefix=${CMAKE_INSTALL_PREFIX}")
+
+            if(NOT SUPPRESS_VERBOSE_OUTPUT)
+                message(STATUS "setup tools options: ${SETUP_OPTS}")
+            endif()
+
+            install(CODE "execute_process(
+                    COMMAND ${PYTHON${ver}_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/setup.py install ${SETUP_OPTS}
+                    WORKING_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}
+                    )")
+        endmacro()
+
+        if(PYTHON2_EXECUTABLE)
+            install_py(2)
+        endif()
+
+        if(PYTHON3_EXECUTABLE)
+            install_py(3)
+        endif()
     else()
         set(SETUP_OPTS "${SETUP_OPTS} --record=rekord.txt --prefix=${CMAKE_INSTALL_PREFIX}")
         string(REPLACE "/" "\\\\" SETUP_OPTS ${SETUP_OPTS})
