@@ -209,19 +209,20 @@ if(NOT SKIP_INSTALL_LIBRARIES AND NOT SKIP_INSTALL_ALL )
             install_py(3)
         endif()
     else()
-        set(SETUP_OPTS "${SETUP_OPTS} --record=rekord.txt --prefix=${CMAKE_INSTALL_PREFIX}")
+        set(SETUP_OPTS "${SETUP_OPTS} --single-version-externally-managed  --record=rekord.txt --prefix=${CMAKE_INSTALL_PREFIX}")
         string(REPLACE "/" "\\\\" SETUP_OPTS ${SETUP_OPTS})
-        message(">>> SETUP_OPTS: ${SETUP_OPTS}")
         macro(install_win_py ver)
-            install(CODE "execute_process( \
-                COMMAND ${PYTHON${ver}_EXECUTABLE} setup.py install ${SETUP_OPTS} \
-                WORKING_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME} \
+            install(CODE "execute_process(
+                COMMAND ${PYTHON${ver}_EXECUTABLE} setup.py install ${SETUP_OPTS}
+                WORKING_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}
                 )")
         endmacro()
 
         if(PYTHON2_EXECUTABLE)
             install_win_py(2)
-        elseif(PYTHON3_EXECUTABLE)
+        endif()
+
+        if(PYTHON3_EXECUTABLE)
             install_win_py(3)
         endif()
     endif()
