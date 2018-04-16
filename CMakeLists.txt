@@ -91,20 +91,32 @@ else()
     set(PYTHON_EXECUTABLE ${PYTHON3_EXECUTABLE})
 endif()
 
-file(DOWNLOAD "https://pypi.python.org/pypi/${PROJECT_NAME}/json" "${CMAKE_CURRENT_BINARY_DIR}/meta.json")
+file(GLOB LOCAL_SOURCES_ARCHIVES LIST_DIRECTORIES false "*.tar.gz")
+if(LOCAL_SOURCES_ARCHIVES)
+    list(GET LOCAL_SOURCES_ARCHIVES 0 LOCAL_SOURCES_ARCHIVE)
+    string(REPLACE ".tar.gz" "" LOCAL_SOURCES_VERSION ${LOCAL_SOURCES_ARCHIVE})
+    string(REPLACE "${CMAKE_CURRENT_SOURCE_DIR}" "" LOCAL_SOURCES_VERSION ${LOCAL_SOURCES_VERSION})
+    string(SUBSTRING ${LOCAL_SOURCES_VERSION} 8 -1 VERSION)
+    message(STATUS "Local sources found: ${LOCAL_SOURCES_ARCHIVE}, version: ${VERSION}")
+endif()
 
 include(util)
 get_compiler_version(COMPILER)
-# get version and download url
-execute_process(COMMAND ${PYTHON_EXECUTABLE}
-    ${CMAKE_SOURCE_DIR}/cmake/pypi_process.py ${PLUGIN} ${CMAKE_CURRENT_BINARY_DIR}/meta.json ${COMPILER}
-    OUTPUT_VARIABLE PACKAGE_DETAILS
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
 
-list(GET PACKAGE_DETAILS 0 DOWNLOAD_URL)
-list(GET PACKAGE_DETAILS 1 VERSION)
-list(GET PACKAGE_DETAILS 2 PROJECT_CPACK_FILENAME)
+if(NOT LOCAL_SOURCES_ARCHIVE)
+    file(DOWNLOAD "https://pypi.python.org/pypi/${PROJECT_NAME}/json" "${CMAKE_CURRENT_BINARY_DIR}/meta.json")
+
+    # get version and download url
+    execute_process(COMMAND ${PYTHON_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/cmake/pypi_process.py ${PLUGIN} ${CMAKE_CURRENT_BINARY_DIR}/meta.json ${COMPILER}
+        OUTPUT_VARIABLE PACKAGE_DETAILS
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+
+    list(GET PACKAGE_DETAILS 0 DOWNLOAD_URL)
+    list(GET PACKAGE_DETAILS 1 VERSION)
+    list(GET PACKAGE_DETAILS 2 PROJECT_CPACK_FILENAME)
+endif()
 
 report_version(${PROJECT_NAME} ${VERSION})
 
@@ -143,11 +155,15 @@ set(BUILD_INCLUDES ${BUILD_INCLUDES} -q)
 set(OUT_DIR_NAME ${PROJECT_NAME}-${VERSION})
 set(OUT_NAME "${OUT_DIR_NAME}.tar.gz")
 
-if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/${OUT_NAME}")
-    status_message("Download ${DOWNLOAD_URL}")
-    file(DOWNLOAD "${DOWNLOAD_URL}" "${CMAKE_CURRENT_BINARY_DIR}/${OUT_NAME}"
-        SHOW_PROGRESS
-    )
+if(LOCAL_SOURCES_ARCHIVE)
+    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/${OUT_NAME} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+else()
+    if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/${OUT_NAME}")
+        status_message("Download ${DOWNLOAD_URL}")
+        file(DOWNLOAD "${DOWNLOAD_URL}" "${CMAKE_CURRENT_BINARY_DIR}/${OUT_NAME}"
+            SHOW_PROGRESS
+        )
+    endif()
 endif()
 
 # Extract archive
