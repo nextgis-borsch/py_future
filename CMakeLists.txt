@@ -107,11 +107,16 @@ if(NOT LOCAL_SOURCES_ARCHIVE)
     file(DOWNLOAD "https://pypi.python.org/pypi/${PROJECT_NAME}/json" "${CMAKE_CURRENT_BINARY_DIR}/meta.json")
 
     # get version and download url
-    execute_process(COMMAND ${PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/cmake/pypi_process.py ${PLUGIN} ${CMAKE_CURRENT_BINARY_DIR}/meta.json ${COMPILER}
-        OUTPUT_VARIABLE PACKAGE_DETAILS
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
+	execute_process(COMMAND
+		${PYTHON_EXECUTABLE}
+		${CMAKE_SOURCE_DIR}/cmake/pypi_process.py
+		${PLUGIN}
+		${CMAKE_CURRENT_BINARY_DIR}/meta.json
+		${COMPILER}
+		${VERSION_MAX}
+		OUTPUT_VARIABLE PACKAGE_DETAILS
+		OUTPUT_STRIP_TRAILING_WHITESPACE
+	)
 
     list(GET PACKAGE_DETAILS 0 DOWNLOAD_URL)
     list(GET PACKAGE_DETAILS 1 VERSION)
